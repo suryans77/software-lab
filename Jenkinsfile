@@ -2,21 +2,21 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'      // Confirmed in your Jenkins
-        jdk   'JDK21'      // Confirmed in your Jenkins
+        maven 'Maven'
+        jdk   'JDK21'
     }
 
     environment {
-        // Your exact Docker Hub path (username + roll number repo + image name)
         DOCKERHUB_REPO = 'suryans77/imt2023041/todo-app'
         IMAGE_TAG      = "${env.BUILD_NUMBER}"
+        FULL_IMAGE     = "${DOCKERHUB_REPO}:${IMAGE_TAG}"
+        LATEST_IMAGE   = "${DOCKERHUB_REPO}:latest"
     }
 
     stages {
         stage('Checkout') {
             steps {
                 echo 'Checking out code from GitHub...'
-                // Automatic because you use Pipeline script from SCM + credential below
             }
         }
 
@@ -34,37 +34,42 @@ pipeline {
         stage('Package → Fat JAR') {
             steps {
                 bat 'mvn -B clean package shade:shade'
-                // Creates target/todo-app.jar (thanks to <finalName>todo-app</finalName>)
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    docker.build("${DOCKERHUB_REPO}:${IMAGE_TAG}")
-                    docker.build("${DOCKERHUB_REPO}:latest")
-                }
+                bat """
+                    docker build -t ${FULL_IMAGE} .
+                    docker tag ${FULL_IMAGE} ${LATEST_IMAGE}
+                """
+                echo "Built ${FULL_IMAGE} and tagged as latest"
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'suryans7') {
-                        // Your exact Docker Hub credential ID
-                        docker.image("${DOCKERHUB_REPO}:${IMAGE_TAG}").push()
-                        docker.image("${DOCKERHUB_REPO}:latest").push()
-                    }
+                withCredentials([usernamePassword(
+                    credentialsId: 'suryans7',           // ← your exact credential ID
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    bat """
+                        echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                        docker push ${FULL_IMAGE}
+                        docker push ${LATEST_IMAGE}
+                    """
                 }
+                echo 'Successfully pushed to Docker Hub!'
             }
         }
     }
 
     post {
         success {
-            echo "SUCCESS! Your image is live at:"
-            echo "https://hub.docker.com/r/suryans77/imt2023041"
-            echo "Run: docker pull suryans77/imt2023041/todo-app:latest"
+            echo 'SUCCESS! Your image is now live on Docker Hub'
+            echo "https://hub.docker.com/r/${DOCKERHUB_REPO}"
+            echo "docker pull ${LATEST_IMAGE}"
         }
         failure {
             echo 'Pipeline failed — check the console output above'
