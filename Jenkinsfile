@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = 'dockerhub-creds'
-        IMAGE_NAME = 'imt2023041/todo-app'
+        IMAGE_NAME = 'suryans77/imt2023041'
         IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
