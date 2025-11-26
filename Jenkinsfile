@@ -17,7 +17,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building the application with Maven...'
-                bat 'mvn clean compile'
+                bat 'mvn clean package'
             }
         }
 
