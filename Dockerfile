@@ -4,7 +4,7 @@ FROM eclipse-temurin:21-jdk
 WORKDIR /app
 
 # Copy the shaded JAR (built by Maven)
-COPY target/todo-cli-app-1.0.jar app.jar
+COPY target/todo-app.jar app.jar
 
 # Run the app
 ENTRYPOINT ["java", "-jar", "app.jar"]
