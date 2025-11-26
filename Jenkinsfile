@@ -10,21 +10,27 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out code from GitHub...'
+                echo 'Pulling code from GitHub...'
+                checkout scm
             }
         }
 
-        stage('Build') {
+        stage('Build & Package') {           // ← FIXED: Now builds the JAR!
             steps {
-                echo 'Building the application with Maven...'
-                bat 'mvn clean compile'
+                echo 'Compiling and creating the fat JAR...'
+                sh 'mvn clean package'       // ← This creates target/todo-app.jar
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'target/todo-app.jar', fingerprint: true
+                }
             }
         }
 
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                bat 'mvn test'
+                sh 'mvn test'
             }
             post {
                 always {
@@ -34,51 +40,33 @@ pipeline {
         }
 
         stage('Build Docker Image') {
-            when {
-                expression {
-                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
-                }
-            }
+            when { expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' } }
             steps {
                 echo 'Building Docker image...'
-                bat "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
-                bat "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
             }
         }
 
         stage('Push to DockerHub') {
-            when {
-                expression {
-                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
-                }
-            }
+            when { expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' } }
             steps {
-                script {
-                    echo 'Logging into DockerHub...'
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
-                                                     usernameVariable: 'DOCKER_USER', 
-                                                     passwordVariable: 'DOCKER_PASS')]) {
-                        bat '''
-                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                            docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                            docker push ${IMAGE_NAME}:latest
-                        '''
-                    }
-                    echo 'Image pushed successfully!'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                                 usernameVariable: 'DOCKER_USER', 
+                                                 passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${IMAGE_NAME}:latest
+                    '''
                 }
             }
         }
     }
 
     post {
-        always {
-            bat 'docker logout || true'
-        }
-        success {
-            echo 'Pipeline completed successfully! Docker image pushed to DockerHub.'
-        }
-        failure {
-            echo 'Pipeline failed.'
-        }
+        always { sh 'docker logout || true' }
+        success { echo 'Pipeline SUCCESS! Image pushed to DockerHub.' }
+        failure { echo 'Pipeline FAILED.' }
     }
 }
