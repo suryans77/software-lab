@@ -46,29 +46,28 @@ pipeline {
             }
         }
 
-        stage('Push to DockerHub') {
-            when {
-                expression {
-                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
-                }
-            }
-            steps {
-                script {
-                    echo 'Logging into DockerHub...'
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
-                                                     usernameVariable: 'DOCKER_USER', 
-                                                     passwordVariable: 'DOCKER_PASS')]) {
-                        bat '''
-                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                            docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                            docker push ${IMAGE_NAME}:latest
-                        '''
-                    }
-                    echo 'Image pushed successfully!'
-                }
-            }
-        }
-    }
+stage('Push to DockerHub') {
+            when {
+                expression {
+                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
+                }
+            }
+            steps {
+                script {
+                    echo 'Logging into DockerHub...'
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                                     usernameVariable: 'DOCKER_USER', 
+                                                     passwordVariable: 'DOCKER_PASS')]) {
+                        bat '''
+                            echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                            docker push %IMAGE_NAME%:%IMAGE_TAG%
+                            docker push %IMAGE_NAME%:latest
+                        '''
+                    }
+                    echo 'Image pushed successfully!'
+                }
+            }
+        }
 
     post {
         always {
