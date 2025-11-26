@@ -1,5 +1,6 @@
-# Official OpenJDK 21 slim image (smallest possible + Java 21)
-FROM openjdk:21-jdk-slim
+
+FROM eclipse-temurin:21-jdk
+
 
 # Create a non-root user (best practice & matches most lab expectations)
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
