@@ -7,7 +7,8 @@ pipeline {
     }
 
     environment {
-        DOCKERHUB_REPO = 'suryans77/imt2023041/todo-app'
+        // Changed to your personal namespace → no organization permission issues
+        DOCKERHUB_REPO = 'suryans77/todo-app'
         IMAGE_TAG      = "${env.BUILD_NUMBER}"
         FULL_IMAGE     = "${DOCKERHUB_REPO}:${IMAGE_TAG}"
         LATEST_IMAGE   = "${DOCKERHUB_REPO}:latest"
@@ -17,6 +18,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Checking out code from GitHub...'
+                checkout scm
             }
         }
 
@@ -50,7 +52,7 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'suryans7',           // ← your exact credential ID
+                    credentialsId: 'suryans7',           // keep your existing credential ID
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
