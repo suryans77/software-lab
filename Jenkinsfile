@@ -1,30 +1,30 @@
 pipeline {
     agent any
 
-    tools {
-        maven 'Maven'
-        jdk   'JDK21'
-    }
-
     environment {
-        // Changed to your personal namespace → no organization permission issues
-        DOCKERHUB_REPO = 'suryans77/todo-app'
-        IMAGE_TAG      = "${env.BUILD_NUMBER}"
-        FULL_IMAGE     = "${DOCKERHUB_REPO}:${IMAGE_TAG}"
-        LATEST_IMAGE   = "${DOCKERHUB_REPO}:latest"
+        DOCKERHUB_CREDENTIALS = 'dockerhub-creds'
+        IMAGE_NAME = 'imt2023041/todo-app'
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
         stage('Checkout') {
             steps {
                 echo 'Checking out code from GitHub...'
-                checkout scm
             }
         }
 
-        stage('Build & Test') {
+        stage('Build') {
             steps {
-                bat 'mvn -B clean test'
+                echo 'Building the application with Maven...'
+                bat 'mvn clean compile'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                bat 'mvn test'
             }
             post {
                 always {
@@ -33,51 +33,52 @@ pipeline {
             }
         }
 
-        stage('Package → Fat JAR') {
-            steps {
-                bat 'mvn -B clean package shade:shade'
-            }
-        }
-
         stage('Build Docker Image') {
+            when {
+                expression {
+                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
+                }
+            }
             steps {
-                bat """
-                    docker build -t ${FULL_IMAGE} .
-                    docker tag ${FULL_IMAGE} ${LATEST_IMAGE}
-                """
-                echo "Built ${FULL_IMAGE} and tagged as latest"
+                echo 'Building Docker image...'
+                bat "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                bat "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
             }
         }
 
-        stage('Push to Docker Hub') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'suryans7',           // keep your existing credential ID
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    bat """
-                        echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-                        docker push ${FULL_IMAGE}
-                        docker push ${LATEST_IMAGE}
-                    """
+        stage('Push to DockerHub') {
+            when {
+                expression {
+                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
                 }
-                echo 'Successfully pushed to Docker Hub!'
+            }
+            steps {
+                script {
+                    echo 'Logging into DockerHub...'
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                                     usernameVariable: 'DOCKER_USER', 
+                                                     passwordVariable: 'DOCKER_PASS')]) {
+                        bat '''
+                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                            docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                            docker push ${IMAGE_NAME}:latest
+                        '''
+                    }
+                    echo 'Image pushed successfully!'
+                }
             }
         }
     }
 
     post {
+        always {
+            bat 'docker logout || true'
+        }
         success {
-            echo 'SUCCESS! Your image is now live on Docker Hub'
-            echo "https://hub.docker.com/r/${DOCKERHUB_REPO}"
-            echo "docker pull ${LATEST_IMAGE}"
+            echo 'Pipeline completed successfully! Docker image pushed to DockerHub.'
         }
         failure {
-            echo 'Pipeline failed — check the console output above'
-        }
-        always {
-            cleanWs()
+            echo 'Pipeline failed.'
         }
     }
 }
