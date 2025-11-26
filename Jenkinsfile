@@ -22,7 +22,7 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-                sh 'mvn -B clean test'
+                bat 'mvn -B clean test'
             }
             post {
                 always {
@@ -33,7 +33,7 @@ pipeline {
 
         stage('Package → Fat JAR') {
             steps {
-                sh 'mvn -B clean package shade:shade'
+                bat 'mvn -B clean package shade:shade'
                 // Creates target/todo-app.jar (thanks to <finalName>todo-app</finalName>)
             }
         }
